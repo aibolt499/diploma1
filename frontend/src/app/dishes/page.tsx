@@ -1,15 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import { Avatar } from '@/components/ui/Avatar'
 import { apiClient } from '@/lib/api'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Dish } from '@/types/dish'
+import { DishList } from '@/components/dishes/DishList'
+import { DishFilters } from '@/components/dishes/DishFilters'
+import { DishHeader } from '@/components/dishes/DishHeader'
 import { 
   ChefHat, 
   Search, 
@@ -465,23 +467,6 @@ export default function DishesPage() {
     }
   }, [searchQuery, dishes])
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { label: 'Чернетка', color: 'bg-gray-100 text-gray-800' },
-      pending: { label: 'На розгляді', color: 'bg-yellow-100 text-yellow-800' },
-      approved: { label: 'Опубліковано', color: 'bg-green-100 text-green-800' },
-      rejected: { label: 'Відхилено', color: 'bg-red-100 text-red-800' }
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
-      </span>
-    )
-  }
-
   const getTotalCookingTime = (dish: Dish) => {
     if (!dish.steps || !Array.isArray(dish.steps)) return null
     const total = dish.steps.reduce((sum, step) => sum + (step.duration_minutes || 0), 0)
@@ -659,185 +644,16 @@ export default function DishesPage() {
       </Card>
 
       {/* Dishes Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Завантаження страв...</p>
-          </div>
-        </div>
-      ) : filteredDishes.length === 0 ? (
-        <div className="text-center py-12">
-          <ChefHat className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchQuery || selectedCategory ? 'Страви не знайдено' : 'Немає страв'}
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {searchQuery || selectedCategory 
-              ? 'Спробуйте змінити критерії пошуку або очистити фільтри'
-              : 'Станьте першим, хто додасть страву!'
-            }
-          </p>
-          {searchQuery || selectedCategory ? (
-            <div className="flex justify-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchQuery('')
-                  setSelectedCategory('')
-                }}
-              >
-                Очистити фільтри
-              </Button>
-            </div>
-          ) : (
-            <Link href="/dishes/add">
-              <Button leftIcon={<Plus className="w-4 h-4" />}>
-                Додати першу страву
-              </Button>
-            </Link>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDishes.map((dish) => {
-            const cookingTime = getTotalCookingTime(dish)
-            const likesCount = dish.ratings?.filter(r => r.rating === 1 || r.rating === "1").length || 0
-            const dishCategories = getDishCategories(dish)
-            const hasIngredients = dish.ingredients && dish.ingredients.length > 0
-
-            return (
-              <Card key={dish.id} className="hover:shadow-lg transition-shadow overflow-hidden group cursor-pointer">
-                {/* Image */}
-                <div 
-                  className="aspect-video bg-gray-200 overflow-hidden relative"
-                  onClick={() => handleViewDish(dish.id)}
-                >
-                  {dish.main_image_url ? (
-                    <img
-                      src={dish.main_image_url}
-                      alt={dish.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ChefHat className="w-12 h-12 text-gray-400" />
-                    </div>
-                  )}
-                  
-                  {/* Nutrition Badge */}
-                  {hasIngredients && (
-                    <div className="absolute top-2 left-2">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <Activity className="w-3 h-3 mr-1" />
-                        Аналіз калорій
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        leftIcon={<Eye className="w-4 h-4" />}
-                      >
-                        Переглянути
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <CardContent className="p-6">
-                  {/* Header */}
-                  <div className="mb-3">
-                    <h3 className="font-semibold text-gray-900 text-lg mb-1 line-clamp-2">
-                      {dish.title}
-                    </h3>
-                    <p className="text-gray-600 text-sm line-clamp-2">
-                      {dish.description}
-                    </p>
-                  </div>
-
-                  {/* Categories */}
-                  {dishCategories.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {dishCategories.slice(0, 2).map((cat, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
-                        >
-                          <Grid3X3 className="w-3 h-3 mr-1" />
-                          {cat.dish_categories?.name || cat.name}
-                        </span>
-                      ))}
-                      {dishCategories.length > 2 && (
-                        <span className="text-xs text-gray-500">
-                          +{dishCategories.length - 2}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Stats */}
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center">
-                        <Users className="w-4 h-4 mr-1" />
-                        {dish.servings}
-                      </div>
-                      {cookingTime && (
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {cookingTime}хв
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center">
-                        <Heart className="w-4 h-4 mr-1" />
-                        {likesCount}
-                      </div>
-                      <div className="flex items-center">
-                        <MessageCircle className="w-4 h-4 mr-1" />
-                        {dish.comments_count || 0}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Author */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Avatar
-                        src={dish.profiles?.avatar_url}
-                        name={dish.profiles?.full_name || dish.profiles?.email}
-                        size="sm"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {dish.profiles?.full_name || 'Невідомий автор'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatRelativeTime(dish.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/dishes/${dish.id}`}>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                      >
-                        Переглянути
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+      <DishList
+        dishes={filteredDishes}
+        isLoading={isLoading}
+        onViewDetails={handleViewDish}
+        emptyTitle="Страви не знайдено"
+        emptyDescription="Спробуйте змінити критерії пошуку або очистити фільтри"
+        searchQuery={searchQuery}
+        getTotalCookingTime={getTotalCookingTime}
+        getDishCategories={getDishCategories}
+      />
 
       {/* Dish Details Modal */}
       <DishDetailsModal
